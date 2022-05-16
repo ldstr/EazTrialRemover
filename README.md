@@ -3,7 +3,7 @@
 ![dotnet6.0](https://img.shields.io/badge/.NET-6.0-blue?style=for-the-badge)
 ![License-MIT](https://img.shields.io/badge/License-MIT-Green?style=for-the-badge)
 
-Removes Eazfuscator.NET's evaluation period (aka trial limit) from protected assemblies — this allows it to run forever instead of expiring after seven days.
+Removes Eazfuscator.NET's evaluation period (aka trial limit) from protected assemblies — this allows it to run forever instead of expiring after seven days. [Download](https://github.com/Plot1337/EazTrialRemover/releases)
 
 ---
 

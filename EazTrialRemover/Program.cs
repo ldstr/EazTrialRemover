@@ -1,5 +1,6 @@
-﻿using dnlib.DotNet;
+using dnlib.DotNet;
 using dnlib.DotNet.Emit;
+using System.Diagnostics;
 
 namespace EazTrialRemover
 {
@@ -15,21 +16,40 @@ namespace EazTrialRemover
                 return;
             }
 
-            string path = args[0];
+            int len = args.Length;
+            Console.WriteLine($"Loaded {len} {(len > 1 ? "assemblies" : "assembly")}!");
 
-            if (!path.EndsWith("exe") && !path.EndsWith("dll"))
+            foreach (string path in args)
             {
-                Exit("Invalid input!");
-                return;
-            }
-            else if (!File.Exists(path))
-            {
-                Exit("Assembly not found!");
-                return;
-            }
+                var sw = Stopwatch.StartNew();
+                sw.Start();
 
-            try { Patch(path); }
-            catch { WriteLnColored("Failed to patch!", ConsoleColor.Red); }
+                WriteColored("Attempting to patch: ", ConsoleColor.Blue);
+                Console.WriteLine(path);
+
+                if (!path.EndsWith("exe") && !path.EndsWith("dll"))
+                {
+                    Exit("Invalid input!");
+                    continue;
+                }
+                else if (!File.Exists(path))
+                {
+                    Exit("Assembly not found!");
+                    continue;
+                }
+
+                try { Patch(path); }
+                catch { WriteLnColored("Failed to patch!", ConsoleColor.Red); }
+                finally
+                {
+                    sw.Stop();
+
+                    WriteLnColored(
+                        $"Task completed in {sw.Elapsed.TotalSeconds} seconds!",
+                        ConsoleColor.Yellow
+                        );
+                }
+            }
 
             Exit();
         }
@@ -39,71 +59,185 @@ namespace EazTrialRemover
             var module = ModuleDefMD.Load(path);
             var types = module.GetTypes();
 
-            bool patched = false;
+            bool
+                patchedCheck = false,
+                patchedVoid = false;
 
-            foreach (var type in types)
+            for (int i = 0; i < types.Count(); i++)
             {
-                if (!type.HasMethods)
+                var type = types.ElementAt(i);
+
+                if (patchedCheck && patchedVoid)
+                    break;
+                else if (!type.HasMethods)
                     continue;
 
-                const string BOOL = "System.Boolean";
-                var methods = type.FilterMethods(BOOL);
+                if (!patchedCheck)
+                    patchedCheck = PatchCheckMethod(ref type);
 
-                if (methods.Count != 1)
-                    continue;
-
-                var method = methods.FirstOrDefault();
-
-                if (method == null || !method.HasBody)
-                    continue;
-
-                var body = method.Body;
-
-                if (!body.HasInstructions)
-                    continue;
-
-                var insts = body.Instructions;
-
-                if (insts.Count != 3)
-                    continue;
-
-                if (
-                    insts[1].OpCode == OpCodes.Call &&
-                    insts[2].OpCode == OpCodes.Ret
-                    )
-                {
-                    Console.Write("Found: ");
-                    WriteLnColored("0x" + type.MDToken, ConsoleColor.Red);
-
-                    insts.Clear();
-                    insts.Add(OpCodes.Ldc_I4_1.ToInstruction());
-                    insts.Add(OpCodes.Ret.ToInstruction());
-
-                    body.ExceptionHandlers.Clear();
-
-                    WriteLnColored("Patched!");
-                    Save(module, path);
-
-                    patched = true;
-                }
+                if (!patchedVoid)
+                    patchedVoid = PatchVoidMethod(ref type);
             }
 
-            if (!patched)
-                WriteLnColored("Failed to patch!", ConsoleColor.Red);
+            if (patchedCheck && patchedVoid) Save(module, path);
+            else WriteLnColored("Failed to patch!", ConsoleColor.Red);
+        }
+
+        private static bool PatchCheckMethod(ref TypeDef type)
+        {
+            bool ok = TryFindMethod(
+                type,
+                "System.Boolean",
+                3,
+                out var body,
+                out var insts
+                );
+
+            if (!ok || body == null || insts == null)
+                return false;
+            else if (
+                insts[1].OpCode == OpCodes.Call &&
+                insts[2].OpCode == OpCodes.Ret
+                )
+            {
+                Console.Write("Found check method: ");
+                WriteLnColored("0x" + type.MDToken, ConsoleColor.Red);
+
+                insts.Clear();
+                insts.Add(OpCodes.Ldc_I4_1.ToInstruction());
+                insts.Add(OpCodes.Ret.ToInstruction());
+
+                WriteLnColored("Patched check method!", ConsoleColor.Green);
+                return true;
+            }
+            else return false;
+        }
+
+        private static bool PatchVoidMethod(ref TypeDef type)
+        {
+            bool ok = TryFindMethod(
+                type,
+                "System.Void",
+                4,
+                out var body,
+                out var insts
+                );
+
+            if (!ok || body == null || insts == null)
+                return false;
+            else if (
+                insts[1].OpCode == OpCodes.Call &&
+                insts[2].OpCode == OpCodes.Pop
+                )
+            {
+                Console.Write("Found void method: ");
+                WriteLnColored("0x" + type.MDToken, ConsoleColor.Red);
+
+                insts.Clear();
+
+                WriteLnColored("Patched void method!", ConsoleColor.Green);
+                return true;
+            }
+            else return false;
+        }
+
+        private static bool TryFindMethod(
+            TypeDef type,
+            string ret,
+            int instsLen,
+            out CilBody? body,
+            out IList<Instruction>? insts
+            )
+        {
+            body = null;
+            insts = null;
+
+            var methods = FilterMethods(type, ret);
+
+            if (methods.Count != 1)
+                return false;
+
+            var method = methods.First();
+
+            if (method == null || !method.HasBody)
+                return false;
+
+            body = method.Body;
+
+            if (!body.HasInstructions)
+                return false;
+
+            insts = body.Instructions;
+            return insts.Count == instsLen;
+        }
+
+        private static List<MethodDef> FilterMethods(
+            TypeDef type,
+            string ret,
+            params string[] input
+            )
+        {
+            int len = input.Length;
+            var result = new List<MethodDef>();
+
+            foreach (var method in type.Methods)
+            {
+                var metPerms = method.Parameters;
+                int metLen = metPerms.Count;
+
+                if (
+                    !method.IsStatic ||
+                    method.ReturnType.FullName != ret ||
+                    input.Length != metLen
+                    ) continue;
+
+                bool match = true;
+
+                for (int i = 0; i < len && i < metLen; i++)
+                    if (metPerms[i].Type.FullName != input[i])
+                    {
+                        match = false;
+                        break;
+                    }
+
+                if (match)
+                    result.Add(method);
+            }
+
+            return result;
         }
 
         private static void Save(ModuleDefMD module, string path)
         {
-            string name = path.EndsWith("exe") ? "exe" : "dll";
+            WriteLnColored("Saving...");
 
-            module.Write(path.Replace('.' + name, "_p." + name));
-            WriteLnColored("Saved!");
+            string
+                name = path.EndsWith("exe") ? "exe" : "dll",
+                bakFile = path.Replace('.' + name, "_backup." + name);
+
+            File.Move(path, bakFile);
+
+            WriteColored("Original assembly moved to: ", ConsoleColor.Blue);
+            Console.WriteLine(bakFile);
+
+            module.Write(path);
+            
+            WriteColored("Saved to: ", ConsoleColor.Blue);
+            Console.WriteLine(path);
         }
 
-        private static void WriteLnColored(string text, ConsoleColor color = ConsoleColor.Green)
+        private static void WriteLnColored(
+            string text,
+            ConsoleColor color = ConsoleColor.Green
+            ) => WriteColored(text + "\n", color);
+
+        private static void WriteColored(
+            string text,
+            ConsoleColor color = ConsoleColor.Green
+            )
         {
             Console.ForegroundColor = color;
-            Console.WriteLine(text);
+            Console.Write(text);
             Console.ResetColor();
         }
 
@@ -116,6 +250,8 @@ namespace EazTrialRemover
                 Console.ResetColor();
             }
 
+            Console.WriteLine();
+            Console.WriteLine("--");
             Console.WriteLine("Press any key to exit...");
             Console.ReadKey(true);
             Environment.Exit(code);

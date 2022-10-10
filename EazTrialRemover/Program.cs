@@ -134,6 +134,7 @@ namespace EazTrialRemover
                 WriteLnColored("0x" + type.MDToken, ConsoleColor.Red);
 
                 insts.Clear();
+                insts.Add(OpCodes.Ret.ToInstruction());
 
                 WriteLnColored("Patched void method!", ConsoleColor.Green);
                 return true;

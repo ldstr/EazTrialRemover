@@ -7,14 +7,15 @@ Removes Eazfuscator.NET's evaluation period (aka trial limit) from protected ass
 
 ---
 
-Usage: `EazTrialRemover.exe <assembly>` or drag-and-drop your protected assembly into `EazTrialRemover.exe`
+### ❓ Usage
+`EazTrialRemover.exe <assembly|assemblies>` or drag-and-drop your protected assembly (or assemblies) into `EazTrialRemover.exe`; yes, you can remove trials from multiple protected assemblies at the same time.
 
 ### 📜 Notes
 - Don't use `PEVerify`
 - This works with the latest Eazfuscator.NET 2022.2 (release build `2022.2.751.89`) and below.
-- The developer's didn't update the trial system for ages; thus, it should be working in future versions.
+- The developers didn't update the trial system for ages; thus, it should be working in future versions.
 - Tested and works with Class Libraries, Console Apps, and WinForms; should work with others, too.
-- If there any any bugs, please open an issue.
+- If there are any bugs, please open an issue.
 
 #### Tool not working?
 Once again, open an issue or you can change the date of your PC to something in the future (perhaps 10 years) and then protect your assembly. Yes, this means you don't even need this tool (or anything similar) to remove the expiration.

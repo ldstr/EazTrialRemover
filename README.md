@@ -11,7 +11,8 @@ Usage: `EazTrialRemover.exe <assembly>` or drag-and-drop your protected assembly
 
 ### Notes
 - Don't use `PEVerify`
-- This works with Eaz.NET 2022.1; however, I am not sure if it will work in the future or in older versions.
+- This works with Eazfuscator.NET 2021.4.255 and below (Download as NuGet package).
+  <br>Building with older versions of Eazfuscator requires [VS 17.0 LTSC](https://learn.microsoft.com/de-de/visualstudio/releases/2022/release-history#fixed-version-bootstrappers) because of an MSBuild update in VS 17.3.
 - Works with Console and WinForms; should work for class-library and others, too.
 - If there any any bugs, please open a issue.
 

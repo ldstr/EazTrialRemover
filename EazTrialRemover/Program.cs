@@ -79,7 +79,8 @@ internal class Program
                 patchedVoid = PatchVoidMethod(ref type);
         }
 
-        if (patchedCheck && patchedVoid) Save(module, path);
+        /* TODO: Look into this */
+        if (patchedCheck || patchedVoid) Save(module, path);
         else WriteLnColored("Failed to patch!", ConsoleColor.Red);
     }
 

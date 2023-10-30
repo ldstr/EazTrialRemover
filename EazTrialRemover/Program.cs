@@ -105,23 +105,21 @@ static bool IsTrialCheckClass(TypeDef type)
     if (methods.Count != 4)
         return false;
 
-    bool methodsRetsBool = true, methodsRetsVoid = true;
-
     for (int i = 0; i < 4; i++)
     {
         if (i < 2)
         {
             if (!MethodRets(methods[i], "Boolean"))
-                methodsRetsBool = false;
+                return false;
         }
         else
         {
             if (!MethodRets(methods[i]))
-                methodsRetsVoid = false;
+                return false;
         }
     }
 
-    return methodsRetsBool && methodsRetsVoid;
+    return true;
 }
 
 static bool MethodRets(
